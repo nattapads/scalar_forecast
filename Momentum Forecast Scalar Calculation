@@ -1,0 +1,154 @@
+//NSal
+//@version=5
+indicator("[EXP] Momentum Forecast Scalar Calculation [6395]", overlay = true)
+
+//-----------------------------------------------------------------------------}
+//Momentum  Settings
+//-----------------------------------------------------------------------------{
+zeroLag                     = input(false,          title ="Acceleration-Adjusted Momentum", group = "Momentum Settings")
+
+//-----------------------------------------------------------------------------}
+//Risk Settings
+//-----------------------------------------------------------------------------{
+simpleStdLength             = input.int(22,         title = "Simple SD Length", group="Risk Settings")
+expoStdLength               = input.int(32,         title = "Exponential SD Length", group="Risk Settings")
+useExpoStd                  = input(true,           title = "Use Exponential Standard Deviation", group="Risk Settings")
+
+//-----------------------------------------------------------------------------{
+//Instrument Risk Calculation
+//-----------------------------------------------------------------------------{
+percentChange               = array.new_float(0)
+returnChange                = close
+lamda                       = 2.0 / (expoStdLength + 1.0)
+
+// Loop through the last price change and add them to the array
+if useExpoStd == true
+    for i = 0 to expoStdLength
+        returnChange        = (returnChange[i] - returnChange[i+1]) / returnChange[i+1]
+        LambaWeight         = math.pow((1 - lamda), i)
+        array.push(percentChange, (returnChange * LambaWeight))
+else
+    for i = 0 to simpleStdLength
+        returnChange        = (returnChange[i] - returnChange[i+1]) / returnChange[i+1]
+        array.push(percentChange, returnChange)
+
+// Calculate the standard deviation of the percent change
+dailyPercentVolRecent       = math.round(array.stdev(percentChange, false), 6)
+
+// Calculate 8-year (2000 Records) average of SDs (for Exponential SD only)
+return8Yr                   = array.new_float(0)
+
+if useExpoStd == true
+    for i = 0 to 2000
+        array.push(return8Yr, dailyPercentVolRecent[i])
+
+dailyPercentVol8Yr          = array.avg(return8Yr)
+
+// Annualising Instrument Risk
+dailyPercentVol             = useExpoStd ? ((0.3 * dailyPercentVol8Yr) + (0.7 * dailyPercentVolRecent)) : dailyPercentVolRecent
+instRisk                    = math.round((dailyPercentVol * 16), 6)
+dailyPriceVol               = dailyPercentVol * close
+
+//-----------------------------------------------------------------------------}
+//Momentum Calculation
+//-----------------------------------------------------------------------------{
+momentumForcCal(length, multiplier) =>
+    EmaLength               = length * multiplier
+
+    if zeroLag == true
+        Ema                 = ta.ema(close, EmaLength)
+        smoEma              = ta.ema(Ema, EmaLength)
+        eq                  = Ema - smoEma
+        zlEma               = Ema + eq
+    else
+        zlEma               = ta.ema(close, EmaLength)
+
+rapidMoLength               = 8
+fastMoLength                = 16
+mediumMoLength              = 32
+slowMoLength                = 64
+
+rapidEma                    = momentumForcCal(rapidMoLength, 1)
+rapidSEma                   = momentumForcCal(rapidMoLength, 4)
+fastEma                     = momentumForcCal(fastMoLength, 1)
+fastSEma                    = momentumForcCal(fastMoLength, 4)
+mediumEma                   = momentumForcCal(mediumMoLength, 1)
+mediumSEma                  = momentumForcCal(mediumMoLength, 4)
+slowEma                     = momentumForcCal(slowMoLength, 1)
+slowSEma                    = momentumForcCal(slowMoLength, 4)
+
+//-----------------------------------------------------------------------------}
+//Momentum Forcast Calculation
+//-----------------------------------------------------------------------------{
+//Rapid Momentum Forecast
+//-----------------------------------------------------------------------------{
+var float rawRapidForecast       = na
+var float absRawRapidForecast    = na
+arrRawRapidForecast              = array.new_float(0)
+
+for i = 0 to 2000
+    rawRapidForecast             := (rapidEma[i] - rapidSEma[i]) / dailyPriceVol[i]
+    absRawRapidForecast          := math.abs(rawRapidForecast)
+    array.push(arrRawRapidForecast, absRawRapidForecast)
+
+avgRapidForecast                 = array.avg(arrRawRapidForecast)
+rapidMoScalar                    = 10 / avgRapidForecast
+
+
+//Fast Momentum Forecast
+//-----------------------------------------------------------------------------{
+var float rawFastForecast       = na
+var float absRawFastForecast    = na
+arrRawFastForecast              = array.new_float(0)
+
+for i = 0 to 2000
+    rawFastForecast             := (fastEma[i] - fastSEma[i]) / dailyPriceVol[i]
+    absRawFastForecast          := math.abs(rawFastForecast)
+    array.push(arrRawFastForecast, absRawFastForecast)
+
+avgFastForecast                 = array.avg(arrRawFastForecast)
+fastMoScalar                    = 10 / avgFastForecast
+
+//Medium Momentum Forecast
+//-----------------------------------------------------------------------------{
+var float rawMedForecast       = na
+var float absRawMedForecast    = na
+arrRawMedForecast              = array.new_float(0)
+
+for i = 0 to 2000
+    rawMedForecast             := (mediumEma[i] - mediumSEma[i]) / dailyPriceVol[i]
+    absRawMedForecast          := math.abs(rawMedForecast)
+    array.push(arrRawMedForecast, absRawMedForecast)
+
+avgMedForecast                 = array.avg(arrRawMedForecast)
+medMoScalar                    = 10 / avgMedForecast
+
+//Slow Momentum Forecast
+//-----------------------------------------------------------------------------{
+var float rawSlowForecast       = na
+var float absRawSlowForecast    = na
+arrRawSlowForecast              = array.new_float(0)
+
+for i = 0 to 2000
+    rawSlowForecast             := (slowEma[i] - slowSEma[i]) / dailyPriceVol[i]
+    absRawSlowForecast          := math.abs(rawSlowForecast)
+    array.push(arrRawSlowForecast, absRawSlowForecast)
+
+avgSlowForecast                 = array.avg(arrRawSlowForecast)
+slowMoScalar                    = 10 / avgSlowForecast
+
+//Table Styling
+//-----------------------------------------------------------------------------{ 
+bgMColour                   = color.rgb(0, 0, 0, 30)
+bgSColour                   = color.rgb(0, 0, 0, 20)
+    
+//-----------------------------------------------------------------------------}
+//Performance Table
+//-----------------------------------------------------------------------------{ 
+table_data                  = table.new(position = position.top_right, columns = 1, rows = 5, bgcolor = color.rgb(0, 0, 0, 100), frame_width = 1, border_width = 1)
+
+table.cell(table_data, 0, 0, "MOS782", bgcolor = color.rgb(255, 255, 255, 70), text_size = size.normal, text_color = color.rgb(255, 255, 255))
+table.cell(table_data, 0, 1, str.tostring(math.round(rapidMoScalar, 3)) , text_size = size.normal, bgcolor = bgMColour, text_color = color.rgb(255, 255, 255), text_halign  = text.align_center, tooltip = "Rapid Scalar")
+table.cell(table_data, 0, 2, str.tostring(math.round(fastMoScalar, 3)) , text_size = size.normal, bgcolor = bgMColour, text_color = color.rgb(255, 255, 255), text_halign  = text.align_center, tooltip = "Fast Scalar")
+table.cell(table_data, 0, 3, str.tostring(math.round(medMoScalar, 3)) , text_size = size.normal, bgcolor = bgMColour, text_color = color.rgb(255, 255, 255), text_halign  = text.align_center, tooltip = "Medium Scalar")
+table.cell(table_data, 0, 4, str.tostring(math.round(slowMoScalar, 3)) , text_size = size.normal, bgcolor = bgMColour, text_color = color.rgb(255, 255, 255), text_halign  = text.align_center, tooltip = "Slow Scalar")
