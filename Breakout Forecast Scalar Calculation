@@ -1,0 +1,71 @@
+//NSal
+//@version=5
+indicator("[EXP] Breakout Forecast Scalar Calculation [6395]", overlay = true)
+
+//-----------------------------------------------------------------------------}
+//Breakout Forcast Calculation
+//-----------------------------------------------------------------------------{
+capForecastBo(BreakLength) =>
+    var float cappedForcBo  = na
+
+    max                     = ta.highest(high, BreakLength)
+    min                     = ta.lowest(low, BreakLength)
+    mean                    = (max + min) / 2
+    BoForc                  = (40 * (close - mean)) /  (max - min)
+    smoothLength            = BreakLength / 4
+    smoothForcBo            = ta.ema(BoForc, smoothLength)
+
+cappedForcBo20              = capForecastBo(20)
+cappedForcBo40              = capForecastBo(40)
+cappedForcBo80              = capForecastBo(80)
+
+//20 Breakout Forecast
+//-----------------------------------------------------------------------------{
+var float absRaw20Forecast      = na
+arrRaw20Forecast                = array.new_float(0)
+
+for i = 0 to 2000
+    absRaw20Forecast            := math.abs(cappedForcBo20[i])
+    array.push(arrRaw20Forecast, absRaw20Forecast)
+
+avg20Forecast                 = array.avg(arrRaw20Forecast)
+br20Scalar                    = 10 / avg20Forecast
+
+//40 Breakout Forecast
+//-----------------------------------------------------------------------------{
+var float absRaw40Forecast      = na
+arrRaw40Forecast                = array.new_float(0)
+
+for i = 0 to 2000
+    absRaw40Forecast            := math.abs(cappedForcBo40[i])
+    array.push(arrRaw40Forecast, absRaw40Forecast)
+
+avg40Forecast                 = array.avg(arrRaw40Forecast)
+br40Scalar                    = 10 / avg40Forecast
+
+//80 Breakout Forecast
+//-----------------------------------------------------------------------------{
+var float absRaw80Forecast      = na
+arrRaw80Forecast                = array.new_float(0)
+
+for i = 0 to 2000
+    absRaw80Forecast            := math.abs(cappedForcBo80[i])
+    array.push(arrRaw80Forecast, absRaw80Forecast)
+
+avg80Forecast                 = array.avg(arrRaw80Forecast)
+br80Scalar                    = 10 / avg80Forecast
+
+//Table Styling
+//-----------------------------------------------------------------------------{ 
+bgMColour                   = color.rgb(0, 0, 0, 30)
+bgSColour                   = color.rgb(0, 0, 0, 20)
+    
+//-----------------------------------------------------------------------------}
+//Performance Table
+//-----------------------------------------------------------------------------{ 
+table_data                  = table.new(position = position.bottom_right, columns = 1, rows = 4, bgcolor = color.rgb(0, 0, 0, 100), frame_width = 1, border_width = 1)
+
+table.cell(table_data, 0, 0, "BRS782", bgcolor = color.rgb(255, 255, 255, 70), text_size = size.normal, text_color = color.rgb(255, 255, 255))   
+table.cell(table_data, 0, 1, str.tostring(math.round(br20Scalar, 3)) , text_size = size.normal, bgcolor = bgMColour, text_color = color.rgb(255, 255, 255), text_halign  = text.align_center, tooltip = "Fast Scalar")
+table.cell(table_data, 0, 2, str.tostring(math.round(br40Scalar, 3)) , text_size = size.normal, bgcolor = bgMColour, text_color = color.rgb(255, 255, 255), text_halign  = text.align_center, tooltip = "Medium Scalar")
+table.cell(table_data, 0, 3, str.tostring(math.round(br80Scalar, 3)) , text_size = size.normal, bgcolor = bgMColour, text_color = color.rgb(255, 255, 255), text_halign  = text.align_center, tooltip = "Slow Scalar")
